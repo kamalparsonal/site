@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Live Audio</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        #status { margin: 10px; font-weight: bold; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Admin Broadcaster</h1>
+    <div id="login-section">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="loginBtn">Login</button>
+    </div>
+    <div id="control-section" style="display: none;">
+        <button id="goLiveBtn">Go Live</button>
+        <div id="status">Status: Offline</div>
+        <p id="logout-section"><a href="#" id="logoutBtn">Logout</a></p>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <script src="live.js"></script>
+</body>
+</html>
