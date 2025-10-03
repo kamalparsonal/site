@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>অ্যাডমিন লগইন</title>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Hind Siliguri', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h1 { color: #e50914; margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input[type="email"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #e50914; color: white; width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; }
+        button:hover { background-color: #c40812; }
+        #error-message { color: red; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>অ্যাডমিন লগইন</h1>
+        <div class="form-group">
+            <label for="email">ইমেইল:</label>
+            <input type="email" id="email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">পাসওয়ার্ড:</label>
+            <input type="password" id="password" required>
+        </div>
+        <button onclick="login()">লগইন করুন</button>
+        <p id="error-message"></p>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script>
+        // আপনার Firebase প্রকল্পের কনফিগারেশন এখানে পেস্ট করুন
+        const firebaseConfig = {
+  apiKey: "AIzaSyBC9df4ZJjpTyIPzhZiYu4wgfr9z6_qrwY",
+  authDomain: "kamalweb-a70cb.firebaseapp.com",
+  databaseURL: "https://kamalweb-a70cb-default-rtdb.firebaseio.com",
+  projectId: "kamalweb-a70cb",
+  storageBucket: "kamalweb-a70cb.firebasestorage.app",
+  messagingSenderId: "941152623752",
+  appId: "1:941152623752:web:1001f5227264450eb4d33d",
+  measurementId: "G-7JD8EBQML7"
+};
+
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const errorMessage = document.getElementById('error-message');
+
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            errorMessage.textContent = ''; // Clear previous errors
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // সফলভাবে লগইন হলে admin.html পেজে পাঠিয়ে দেওয়া হবে
+                    window.location.href = 'admin.html';
+                })
+                .catch((error) => {
+                    errorMessage.textContent = 'ভুল ইমেইল অথবা পাসওয়ার্ড।';
+                });
+        }
+    </script>
+</body>
+</html>
