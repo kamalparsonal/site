@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>অ্যাডমিন প্যানেল</title>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary-color: #e50914; }
+        body { font-family: 'Hind Siliguri', sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; visibility: hidden; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;}
+        h1, h2 { color: var(--primary-color); text-align: center; margin-bottom: 20px; }
+        .form-section, .channel-list-section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input[type="text"], input[type="url"], input[type="color"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: var(--primary-color); color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #c40812; }
+        #logout-btn { background-color: #6c757d; }
+        #logout-btn:hover { background-color: #5a6268; }
+        .channel-list { list-style: none; padding: 0; }
+        .channel-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .channel-item span { flex-grow: 1; }
+        .channel-item .actions button { margin-left: 10px; padding: 5px 10px; font-size: 14px; }
+        .btn-edit { background-color: #28a745; }
+        .btn-edit:hover { background-color: #218838; }
+        .btn-delete { background-color: #dc3545; }
+        .btn-delete:hover { background-color: #c82333; }
+        #edit-form-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+        #edit-form-container .form-section { width: 90%; max-width: 500px; background: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>অ্যাডমিন প্যানেল</h1>
+            <button id="logout-btn" onclick="logout()">লগআউট</button>
+        </div>
+
+        <div class="form-section">
+            <h2>ওয়েবসাইট সেটিংস</h2>
+            <div class="form-group"><label for="websiteName">ওয়েবসাইটের নাম:</label><input type="text" id="websiteName" placeholder="ওয়েবসাইটের নাম দিন"></div>
+            <div class="form-group"><label for="primaryColor">প্রাইমারি কালার:</label><input type="color" id="primaryColor"></div>
+            <!-- নতুন ইনপুট ফিল্ড: নোটিশ -->
+            <div class="form-group"><label for="notice">স্ক্রলিং নোটিশ:</label><input type="text" id="notice" placeholder="স্ক্রলিং এ দেখানোর জন্য নোটিশ দিন"></div>
+            <button onclick="updateSettings()">সেটিংস সেভ করুন</button>
+        </div>
+
+        <div class="form-section">
+            <h2>নতুন চ্যানেল যোগ করুন</h2>
+            <div class="form-group"><label for="channelName">চ্যানেলের নাম:</label><input type="text" id="channelName" placeholder="চ্যানেলের নাম"></div>
+            <div class="form-group"><label for="logoUrl">লোগো URL:</label><input type="url" id="logoUrl" placeholder="চ্যানেলের লোগোর লিঙ্ক"></div>
+            <div class="form-group"><label for="m3u8Url">M3U8 URL:</label><input type="url" id="m3u8Url" placeholder="লাইভ স্ট্রিমের M3U8 লিঙ্ক"></div>
+            <button onclick="addChannel()">চ্যানেল যোগ করুন</button>
+        </div>
+
+        <div class="channel-list-section">
+            <h2>বিদ্যমান চ্যানেল তালিকা</h2>
+            <ul id="channel-list" class="channel-list"></ul>
+        </div>
+    </div>
+
+    <div id="edit-form-container">
+        <div class="form-section">
+            <h2>চ্যানেল এডিট করুন</h2>
+            <input type="hidden" id="editChannelKey">
+            <div class="form-group"><label for="editChannelName">চ্যানেলের নাম:</label><input type="text" id="editChannelName"></div>
+            <div class="form-group"><label for="editLogoUrl">লোগো URL:</label><input type="url" id="editLogoUrl"></div>
+            <div class="form-group"><label for="editM3u8Url">M3U8 URL:</label><input type="url" id="editM3u8Url"></div>
+            <button onclick="updateChannel()">আপডেট করুন</button>
+            <button onclick="closeEditForm()" style="background-color:#6c757d;">বাতিল</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyBC9df4ZJjpTyIPzhZiYu4wgfr9z6_qrwY",
+          authDomain: "kamalweb-a70cb.firebaseapp.com",
+          databaseURL: "https://kamalweb-a70cb-default-rtdb.firebaseio.com",
+          projectId: "kamalweb-a70cb",
+          storageBucket: "kamalweb-a70cb.firebasestorage.app",
+          messagingSenderId: "941152623752",
+          appId: "1:941152623752:web:1001f5227264450eb4d33d",
+          measurementId: "G-7JD8EBQML7"
+        };
+
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        
+        const auth = firebase.auth();
+        const database = firebase.database();
+        const settingsRef = database.ref('settings');
+        const channelsRef = database.ref('channels');
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.body.style.visibility = 'visible';
+                loadAdminData();
+            } else {
+                window.location.replace('login.html');
+            }
+        });
+
+        function logout() {
+            auth.signOut().then(() => {
+                window.location.href = 'login.html';
+            });
+        }
+        
+        function loadAdminData(){
+            const channelListUl = document.getElementById('channel-list');
+
+            settingsRef.on('value', (snapshot) => {
+                const settings = snapshot.val();
+                if(settings) {
+                    document.getElementById('websiteName').value = settings.websiteName || '';
+                    const primaryColor = settings.primaryColor || '#e50914';
+                    document.getElementById('primaryColor').value = primaryColor;
+                    document.documentElement.style.setProperty('--primary-color', primaryColor);
+                    // পরিবর্তিত কোড: নোটিশ লোড
+                    document.getElementById('notice').value = settings.notice || '';
+                }
+            });
+
+            channelsRef.on('value', (snapshot) => {
+                channelListUl.innerHTML = '';
+                const channels = snapshot.val();
+                if (channels) {
+                    Object.keys(channels).forEach(key => {
+                        const channel = channels[key];
+                        const li = document.createElement('li');
+                        li.className = 'channel-item';
+                        li.innerHTML = `
+                            <span>${channel.name}</span>
+                            <div class="actions">
+                                <button class="btn-edit" onclick="showEditForm('${key}', '${channel.name}', '${channel.logoUrl}', '${channel.m3u8Url}')">এডিট</button>
+                                <button class="btn-delete" onclick="deleteChannel('${key}')">ডিলেট</button>
+                            </div>`;
+                        channelListUl.appendChild(li);
+                    });
+                } else {
+                    channelListUl.innerHTML = '<li>কোনো চ্যানেল পাওয়া যায়নি।</li>';
+                }
+            });
+        }
+
+        function updateSettings() {
+            settingsRef.update({
+                websiteName: document.getElementById('websiteName').value,
+                primaryColor: document.getElementById('primaryColor').value,
+                // পরিবর্তিত কোড: নোটিশ সেভ
+                notice: document.getElementById('notice').value
+            })
+            .then(() => alert('সেটিংস সফলভাবে আপডেট হয়েছে!'))
+            .catch(error => alert('ত্রুটি: ' + error.message));
+        }
+
+        function addChannel() {
+            const name = document.getElementById('channelName').value;
+            const logoUrl = document.getElementById('logoUrl').value;
+            const m3u8Url = document.getElementById('m3u8Url').value;
+            if (name && logoUrl && m3u8Url) {
+                channelsRef.push({ name, logoUrl, m3u8Url })
+                    .then(() => {
+                        alert('চ্যানেল সফলভাবে যোগ করা হয়েছে!');
+                        document.getElementById('channelName').value = '';
+                        document.getElementById('logoUrl').value = '';
+                        document.getElementById('m3u8Url').value = '';
+                    })
+                    .catch(error => alert('ত্রুটি: ' + error.message));
+            } else {
+                alert('অনুগ্রহ করে সমস্ত তথ্য পূরণ করুন।');
+            }
+        }
+
+        function deleteChannel(key) {
+            if (confirm('আপনি কি এই চ্যানেলটি ডিলেট করতে নিশ্চিত?')) {
+                channelsRef.child(key).remove()
+                    .then(() => alert('চ্যানেল সফলভাবে ডিলেট করা হয়েছে।'))
+                    .catch(error => alert('ত্রুটি: ' + error.message));
+            }
+        }
+        
+        const editFormContainer = document.getElementById('edit-form-container');
+        function showEditForm(key, name, logoUrl, m3u8Url) {
+            document.getElementById('editChannelKey').value = key;
+            document.getElementById('editChannelName').value = name;
+            document.getElementById('editLogoUrl').value = logoUrl;
+            document.getElementById('editM3u8Url').value = m3u8Url;
+            editFormContainer.style.display = 'flex';
+        }
+
+        function closeEditForm() {
+            editFormContainer.style.display = 'none';
+        }
+
+        function updateChannel() {
+            const key = document.getElementById('editChannelKey').value;
+            channelsRef.child(key).update({
+                name: document.getElementById('editChannelName').value,
+                logoUrl: document.getElementById('editLogoUrl').value,
+                m3u8Url: document.getElementById('editM3u8Url').value
+            })
+            .then(() => {
+                alert('চ্যানেল সফলভাবে আপডেট হয়েছে!');
+                closeEditForm();
+            })
+            .catch(error => alert('ত্রুটি: ' + error.message));
+        }
+    </script>
+</body>
+              </html>
