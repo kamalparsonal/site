@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live TV Player</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Hind+Siliguri:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #e50914; 
+            --background-dark: #121212;
+            --background-light: #1d1d1d;
+            --text-primary: #ffffff;
+            --border-color: #2d2d2d;
+            --item-hover-bg: #2a2a2a;
+            --scroll-thumb: #555;
+            --shadow-color: rgba(229, 9, 20, 0.5);
+            --favorite-color: #ffc107; /* নতুন: ফেভারিট আইকনের রঙ */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Poppins', 'Hind Siliguri', sans-serif;
+            background-color: var(--background-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #preloader {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #1a1a1a; display: flex; justify-content: center;
+            align-items: center; z-index: 9999; transition: opacity 0.7s ease, visibility 0.7s ease;
+        }
+        #preloader img { max-width: 150px; animation: pulse 1.5s ease-in-out infinite; }
+        #preloader.hidden { opacity: 0; visibility: hidden; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+
+        .main-container { display: flex; flex-direction: column; height: 100vh; }
+        header {
+            padding: 15px 30px; background-color: var(--background-dark);
+            border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+            text-align: center; /* পরিবর্তিত: শিরোনাম মাঝে আনার জন্য */
+        }
+        header h1 { 
+            font-size: 2rem; font-weight: 700; color: var(--primary-color);
+            letter-spacing: 1.5px; text-shadow: 0 0 8px var(--shadow-color);
+        }
+
+        .content-wrapper { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+        #video-container {
+            position: relative; background-color: #000; aspect-ratio: 16 / 9;
+            width: 100%; flex-shrink: 0; box-shadow: 0 0 20px -5px var(--primary-color);
+        }
+        #video-player { width: 100%; height: 100%; }
+        
+        .player-overlay { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; }
+        
+        .control-btn { background: none; border: none; cursor: pointer; padding: 8px; display: flex; justify-content: center; align-items: center; transition: transform 0.2s; }
+        .control-btn:hover { transform: scale(1.15); }
+        .control-btn svg { width: 26px; height: 26px; fill: white; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+
+        #play-pause-btn { background-color: rgba(0,0,0,0.5); border-radius: 50%; width: 70px; height: 70px; opacity: 0; transition: opacity 0.4s ease-in-out, transform 0.2s; }
+        #play-pause-btn:hover { transform: scale(1.1); }
+        #play-pause-btn svg { width: 32px; height: 32px; margin-left: 3px; }
+        #play-pause-btn .icon-pause { margin-left: 0; }
+
+        .player-controls { position: absolute; bottom: 0; left: 0; right: 0; padding: 5px 15px; display: flex; justify-content: flex-end; align-items: center; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); opacity: 0; transition: opacity 0.4s ease-in-out; }
+        .controls-right { display: flex; align-items: center; gap: 10px; }
+        
+        #video-container.active-controls .player-controls, #video-container.active-controls #play-pause-btn { opacity: 1; }
+
+        #loader { border: 5px solid rgba(255, 255, 255, 0.3); border-top: 5px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+
+        #notice-container { background-color: var(--background-dark); padding: 8px 0; overflow: hidden; white-space: nowrap; flex-shrink: 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        #notice-text { display: inline-block; padding-left: 100%; animation: scroll-left 30s linear infinite; }
+        @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+        #channel-list-container { flex-grow: 1; overflow-y: auto; background-color: var(--background-light); display: flex; flex-direction: column; }
+        
+        .channel-list-header {
+            padding: 10px 15px; background-color: var(--background-dark); border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;
+        }
+        
+        /* নতুন: ফেভারিট চ্যানেল ফিল্টার */
+        #channel-category-filters { display: flex; gap: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+        #channel-category-filters button {
+            background: none; border: 1px solid var(--border-color); color: var(--text-primary);
+            padding: 6px 12px; border-radius: 20px; cursor: pointer; font-family: 'Hind Siliguri', sans-serif;
+            font-weight: 600; transition: all 0.3s ease;
+        }
+        #channel-category-filters button.active { background-color: var(--primary-color); border-color: var(--primary-color); color: white; }
+        #channel-category-filters button:hover:not(.active) { background-color: var(--item-hover-bg); }
+
+        #search-channel { width: 100%; padding: 8px 12px; background-color: var(--background-dark); border: 1px solid var(--border-color); border-radius: 5px; color: var(--text-primary); font-size: 0.9rem; }
+
+        #channel-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        
+        .channel-item { display: flex; align-items: center; padding: 10px; cursor: pointer; border-bottom: 1px solid #252525; transition: all 0.3s ease; border-left: 4px solid transparent; border-radius: 5px; margin-bottom: 5px; background-color: var(--background-dark); }
+        .channel-item:hover { background-color: var(--item-hover-bg); transform: translateX(5px); box-shadow: 0 4px 15px -5px var(--shadow-color); }
+        .channel-item.active { background-color: #333; border-left: 4px solid var(--primary-color); font-weight: 600; }
+        .channel-logo { width: 45px; height: 45px; object-fit: contain; margin-right: 15px; border-radius: 50%; border: 1px solid #444; flex-shrink: 0; }
+        .channel-name { font-size: 1rem; flex-grow: 1; }
+        
+        /* নতুন: ফেভারিট বাটন স্টাইল */
+        .favorite-btn { background: none; border: none; cursor: pointer; padding: 5px; margin-left: 10px; }
+        .favorite-btn svg { width: 22px; height: 22px; transition: transform 0.3s ease, fill 0.3s ease; }
+        .favorite-btn .icon-star-filled { fill: var(--favorite-color); }
+        .favorite-btn .icon-star-outline { fill: #888; }
+        .favorite-btn:hover svg { transform: scale(1.2); }
+        .channel-item.is-favorite .icon-star-outline { display: none; }
+        .channel-item:not(.is-favorite) .icon-star-filled { display: none; }
+
+        #no-favorites-message { text-align: center; padding: 40px; color: #888; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--background-light); }
+        ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <div id="preloader"><img src="https://i.ibb.co.com/LdnZg4T8/image-search-1759472737425.png" alt="Loading Logo"></div>
+
+    <div class="main-container">
+        <header>
+            <h1 id="website-title">Live TV Player</h1>
+        </header>
+        <div class="content-wrapper">
+            <div id="video-container">
+                <video id="video-player" autoplay></video>
+                <div class="player-overlay">
+                    <button id="play-pause-btn" class="control-btn">
+                        <svg class="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                        <svg class="icon-pause hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+                    </button>
+                    <div id="loader" class="hidden"></div>
+                </div>
+                <div class="player-controls">
+                    <div class="controls-right">
+                        <!-- নতুন: ফ্লোটিং বাটন আবার যুক্ত করা হয়েছে -->
+                        <button id="pip-btn" class="control-btn hidden" title="Picture-in-Picture">
+                            <svg viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"></path></svg>
+                        </button>
+                        <button id="mute-unmute-btn" class="control-btn">
+                             <svg class="icon-unmuted" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+                             <svg class="icon-muted hidden" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"></path></svg>
+                        </button>
+                        <button id="fullscreen-btn" class="control-btn">
+                            <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="notice-container" class="hidden">
+                <p id="notice-text"></p>
+            </div>
+            <aside id="channel-list-container">
+                <div class="channel-list-header">
+                     <!-- নতুন: ফেভারিট ফিল্টার বাটন -->
+                    <div id="channel-category-filters">
+                        <button id="all-channels-btn" class="active">সকল চ্যানেল</button>
+                        <button id="fav-channels-btn">প্রিয় তালিকা ★</button>
+                    </div>
+                    <input type="text" id="search-channel" placeholder="চ্যানেল খুঁজুন...">
+                </div>
+                <div id="channel-list"></div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBC9df4ZJjpTyIPzhZiYu4wgfr9z6_qrwY",
+            authDomain: "kamalweb-a70cb.firebaseapp.com",
+            databaseURL: "https://kamalweb-a70cb-default-rtdb.firebaseio.com",
+            projectId: "kamalweb-a70cb",
+            storageBucket: "kamalweb-a70cb.firebasestorage.app",
+            messagingSenderId: "941152623752",
+            appId: "1:941152623752:web:1001f5227264450eb4d33d",
+            measurementId: "G-7JD8EBQML7"
+        };
+
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // DOM এলিমেন্টস
+        const preloader = document.getElementById('preloader');
+        const videoContainer = document.getElementById('video-container');
+        const videoPlayer = document.getElementById('video-player');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const pipBtn = document.getElementById('pip-btn');
+        const muteUnmuteBtn = document.getElementById('mute-unmute-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const loader = document.getElementById('loader');
+        const channelListDiv = document.getElementById('channel-list');
+        const websiteTitle = document.getElementById('website-title');
+        const noticeContainer = document.getElementById('notice-container');
+        const noticeText = document.getElementById('notice-text');
+        const searchInput = document.getElementById('search-channel');
+        const allChannelsBtn = document.getElementById('all-channels-btn');
+        const favChannelsBtn = document.getElementById('fav-channels-btn');
+        
+        let hls = new Hls({ startLevel: -1 });
+        let currentActiveChannel = null;
+        let isInitialLoad = true; 
+        let controlsTimeout;
+        
+        function showControls() {
+            videoContainer.classList.add('active-controls');
+            clearTimeout(controlsTimeout);
+            controlsTimeout = setTimeout(() => videoContainer.classList.remove('active-controls'), 3000);
+        }
+        function hideControls() { videoContainer.classList.remove('active-controls'); }
+
+        videoContainer.addEventListener('mousemove', showControls);
+        videoContainer.addEventListener('mouseleave', hideControls);
+
+        playPauseBtn.addEventListener('click', () => videoPlayer.paused ? videoPlayer.play() : videoPlayer.pause());
+        muteUnmuteBtn.addEventListener('click', () => videoPlayer.muted = !videoPlayer.muted);
+        fullscreenBtn.addEventListener('click', () => {
+            if (document.fullscreenElement) { document.exitFullscreen(); } 
+            else { videoContainer.requestFullscreen().catch(err => alert(`Error: ${err.message}`)); }
+        });
+        
+        // ফ্লোটিং বাটন কার্যকারিতা
+        if ('pictureInPictureEnabled' in document) {
+            pipBtn.classList.remove('hidden');
+            pipBtn.addEventListener('click', () => {
+                if (document.pictureInPictureElement) { document.exitPictureInPicture(); } 
+                else { videoPlayer.requestPictureInPicture().catch(err => console.error(err)); }
+            });
+        }
+        
+        const iconPlay = playPauseBtn.querySelector('.icon-play');
+        const iconPause = playPauseBtn.querySelector('.icon-pause');
+        videoPlayer.addEventListener('play', () => { iconPlay.classList.add('hidden'); iconPause.classList.remove('hidden'); showControls(); });
+        videoPlayer.addEventListener('pause', () => { iconPlay.classList.remove('hidden'); iconPause.classList.add('hidden'); showControls(); });
+        
+        const iconUnmuted = muteUnmuteBtn.querySelector('.icon-unmuted');
+        const iconMuted = muteUnmuteBtn.querySelector('.icon-muted');
+        videoPlayer.addEventListener('volumechange', () => {
+            iconUnmuted.classList.toggle('hidden', videoPlayer.muted);
+            iconMuted.classList.toggle('hidden', !videoPlayer.muted);
+        });
+
+        videoPlayer.addEventListener('waiting', () => { loader.classList.remove('hidden'); playPauseBtn.classList.add('hidden'); });
+        videoPlayer.addEventListener('playing', () => { loader.classList.add('hidden'); playPauseBtn.classList.remove('hidden'); });
+
+        function playVideo(url, channelElement) {
+            loader.classList.remove('hidden'); playPauseBtn.classList.add('hidden');
+            if (Hls.isSupported()) {
+                hls.destroy(); hls = new Hls({ startLevel: -1 }); hls.loadSource(url); hls.attachMedia(videoPlayer);
+            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) { videoPlayer.src = url; }
+            videoPlayer.play();
+            if (currentActiveChannel) currentActiveChannel.classList.remove('active');
+            channelElement.classList.add('active'); currentActiveChannel = channelElement;
+        }
+
+        database.ref('settings').on('value', (snapshot) => {
+            const settings = snapshot.val();
+            if (settings) {
+                if(settings.websiteName) websiteTitle.textContent = settings.websiteName;
+                if(settings.primaryColor) document.documentElement.style.setProperty('--primary-color', settings.primaryColor);
+                if (settings.notice && settings.notice.trim() !== '') {
+                    noticeText.textContent = '📢 ' + settings.notice; noticeContainer.classList.remove('hidden');
+                } else { noticeContainer.classList.add('hidden'); }
+            }
+        });
+
+        // --- নতুন: ফেভারিট চ্যানেল এর জন্য JavaScript ---
+        let favorites = JSON.parse(localStorage.getItem('favoriteChannels')) || [];
+
+        function saveFavorites() { localStorage.setItem('favoriteChannels', JSON.stringify(favorites)); }
+
+        function toggleFavorite(event, key) {
+            event.stopPropagation(); // চ্যানেল প্লে হওয়া থেকে আটকাবে
+            const channelItem = event.currentTarget.closest('.channel-item');
+            if (favorites.includes(key)) {
+                favorites = favorites.filter(favKey => favKey !== key);
+                channelItem.classList.remove('is-favorite');
+            } else {
+                favorites.push(key);
+                channelItem.classList.add('is-favorite');
+            }
+            saveFavorites();
+            
+            // যদি প্রিয় তালিকায় থাকা অবস্থায় কোনো চ্যানেল আনফেভারিট করা হয়
+            if (favChannelsBtn.classList.contains('active')) {
+                filterChannels('fav');
+            }
+        }
+        
+        function filterChannels(filterType) {
+            const channelItems = document.querySelectorAll('.channel-item');
+            let hasFavorites = false;
+            channelItems.forEach(item => {
+                if (filterType === 'fav') {
+                    const isFav = item.classList.contains('is-favorite');
+                    item.style.display = isFav ? '' : 'none';
+                    if (isFav) hasFavorites = true;
+                } else {
+                    item.style.display = '';
+                }
+            });
+
+            // যদি কোনো ফেভারিট না থাকে এবং প্রিয় তালিকা দেখা হয়
+            const noFavMsg = document.getElementById('no-favorites-message');
+            if (filterType === 'fav' && !hasFavorites) {
+                if (!noFavMsg) {
+                    channelListDiv.innerHTML += '<p id="no-favorites-message">আপনার কোনো প্রিয় চ্যানেল নেই।</p>';
+                }
+            } else {
+                if (noFavMsg) noFavMsg.remove();
+            }
+        }
+
+        allChannelsBtn.addEventListener('click', () => {
+            allChannelsBtn.classList.add('active');
+            favChannelsBtn.classList.remove('active');
+            filterChannels('all');
+        });
+
+        favChannelsBtn.addEventListener('click', () => {
+            favChannelsBtn.classList.add('active');
+            allChannelsBtn.classList.remove('active');
+            filterChannels('fav');
+        });
+
+        database.ref('channels').on('value', (snapshot) => {
+            channelListDiv.innerHTML = ''; const channels = snapshot.val();
+            if (channels) {
+                let firstChannelUrl, firstChannelElement;
+                Object.keys(channels).forEach((key, index) => {
+                    const channel = channels[key];
+                    const el = document.createElement('div');
+                    el.className = 'channel-item';
+                    el.dataset.channelKey = key; // ডেটা কী যোগ করা হলো
+                    if(favorites.includes(key)) {
+                        el.classList.add('is-favorite');
+                    }
+                    
+                    el.innerHTML = `
+                        <img src="${channel.logoUrl}" alt="${channel.name}" class="channel-logo">
+                        <span class="channel-name">${channel.name}</span>
+                        <button class="favorite-btn" title="ফেভারিট করুন">
+                           <svg class="icon-star-outline" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                           <svg class="icon-star-filled" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                        </button>`;
+                    
+                    el.querySelector('.favorite-btn').addEventListener('click', (event) => toggleFavorite(event, key));
+                    el.addEventListener('click', () => playVideo(channel.m3u8Url, el));
+
+                    channelListDiv.appendChild(el);
+                    if (index === 0) { firstChannelUrl = channel.m3u8Url; firstChannelElement = el; }
+                });
+                if (firstChannelUrl && firstChannelElement) playVideo(firstChannelUrl, firstChannelElement);
+            } else {
+                channelListDiv.innerHTML = '<p style="text-align:center; padding: 20px;">কোনো চ্যানেল যোগ করা হয়নি।</p>';
+            }
+            if (isInitialLoad) { preloader.classList.add('hidden'); isInitialLoad = false; }
+        });
+
+        searchInput.addEventListener('input', () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const channelItems = document.querySelectorAll('.channel-item');
+            channelItems.forEach(item => {
+                const channelName = item.querySelector('.channel-name').textContent.toLowerCase();
+                item.style.display = channelName.includes(searchTerm) ? '' : 'none';
+            });
+        });
+        
+        showControls();
+    </script>
+</body>
+</html>
